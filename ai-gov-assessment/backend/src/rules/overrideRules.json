@@ -1,0 +1,75 @@
+{
+  "rulesVersion": "1.0.0",
+  "rules": [
+    {
+      "id": "RULE-001",
+      "name": "High-impact automation without oversight",
+      "conditions": [
+        { "type": "dimension", "dimension": "DECISION_IMPACT", "op": ">=", "value": 4 },
+        { "type": "dimension", "dimension": "HUMAN_OVERSIGHT", "op": "<=", "value": 2 }
+      ],
+      "minRiskLevel": "High",
+      "reason": "High-impact automated decisions without sufficient human oversight create significant governance and accountability risks, regardless of the aggregate score."
+    },
+    {
+      "id": "RULE-002",
+      "name": "High regulatory exposure combined with high decision impact",
+      "conditions": [
+        { "type": "dimension", "dimension": "REGULATORY_EXPOSURE", "op": ">=", "value": 4 },
+        { "type": "dimension", "dimension": "DECISION_IMPACT", "op": ">=", "value": 4 }
+      ],
+      "minRiskLevel": "High",
+      "reason": "When a use case is both heavily regulated and has high real-world impact on individuals, understating the risk level could result in non-compliance or consumer harm."
+    },
+    {
+      "id": "RULE-003",
+      "name": "Discriminatory-impact potential without oversight",
+      "conditions": [
+        { "type": "dimension", "dimension": "BIAS_FAIRNESS", "op": ">=", "value": 4 },
+        { "type": "dimension", "dimension": "HUMAN_OVERSIGHT", "op": "<=", "value": 2 }
+      ],
+      "minRiskLevel": "High",
+      "reason": "Significant potential for discriminatory outcomes combined with weak human oversight is a well-established driver of regulatory and reputational risk in financial services."
+    },
+    {
+      "id": "RULE-004",
+      "name": "Fully automated, maximum-impact decision",
+      "conditions": [
+        { "type": "dimension", "dimension": "DECISION_IMPACT", "op": ">=", "value": 5 },
+        { "type": "dimension", "dimension": "HUMAN_OVERSIGHT", "op": "<=", "value": 1 }
+      ],
+      "minRiskLevel": "Critical",
+      "reason": "A fully automated system producing maximum-impact outcomes (e.g., denial of essential financial services) with essentially no human oversight represents the highest governance risk category."
+    },
+    {
+      "id": "RULE-005",
+      "name": "Highly sensitive data with weak security posture",
+      "conditions": [
+        { "type": "dimension", "dimension": "PRIVACY", "op": ">=", "value": 4 },
+        { "type": "dimension", "dimension": "SECURITY", "op": "<=", "value": 2 }
+      ],
+      "minRiskLevel": "Elevated",
+      "reason": "Processing highly sensitive personal or financial data with inadequate security controls creates material breach and compliance exposure."
+    },
+    {
+      "id": "RULE-006",
+      "name": "Elevated model risk without adequate monitoring",
+      "conditions": [
+        { "type": "dimension", "dimension": "MODEL_RISK", "op": ">=", "value": 4 },
+        { "type": "dimension", "dimension": "MONITORING", "op": "<=", "value": 1 }
+      ],
+      "minRiskLevel": "Elevated",
+      "reason": "Complex or drift-prone models deployed without production monitoring can silently degrade, causing undetected harm."
+    },
+    {
+      "id": "RULE-007",
+      "name": "Generative AI providing financial guidance with weak explainability",
+      "conditions": [
+        { "type": "signal", "key": "isGenerativeAI", "equals": true },
+        { "type": "dimension", "dimension": "EXPLAINABILITY", "op": "<=", "value": 2 }
+      ],
+      "minRiskLevel": "Elevated",
+      "reason": "Generative AI outputs used for financial guidance carry hallucination risk; without adequate explainability and documentation, users and reviewers cannot assess reliability."
+    }
+  ]
+}

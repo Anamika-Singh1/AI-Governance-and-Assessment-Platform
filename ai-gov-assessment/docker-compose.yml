@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: aigov
+      POSTGRES_PASSWORD: aigov_local_dev
+      POSTGRES_DB: ai_gov
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aigov -d ai_gov"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot job: applies the SQL migration, then runs the idempotent
+  # seed script (dimensions, curated sources + embeddings, governance
+  # rules, override rules). Runs once per `docker compose up` and exits
+  # 0; "backend" waits for that success before starting so the API
+  # never serves against an unmigrated/unseeded database.
+  db-init:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://aigov:aigov_local_dev@postgres:5432/ai_gov
+    command: sh -c "npm run db:migrate && npm run db:seed"
+    restart: "no"
+
+  backend:
+    build: ./backend
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: 4000
+      NODE_ENV: production
+      DATABASE_URL: postgresql://aigov:aigov_local_dev@postgres:5432/ai_gov
+      PG_POOL_MAX: ${PG_POOL_MAX:-10}
+      API_KEY: ${API_KEY:-changeme-local-dev-key}
+      LLM_PROVIDER: ${LLM_PROVIDER:-deterministic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-5}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      # host.docker.internal (mapped below via extra_hosts) lets
+      # LLM_PROVIDER=local reach an Ollama/LM Studio/vLLM server running
+      # on the HOST machine, not inside the compose network — a local
+      # model server is normally started standalone, not as a compose
+      # service. Override LOCAL_LLM_URL if it's not on the default port.
+      LOCAL_LLM_URL: ${LOCAL_LLM_URL:-http://host.docker.internal:11434/v1/chat/completions}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-llama3.1}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  pgdata:

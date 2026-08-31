@@ -1,0 +1,18 @@
+{
+  "rulesVersion": "1.0.0",
+  "maxScore": 50,
+  "thresholds": [
+    { "level": "Low", "minPercent": 0, "maxPercent": 20 },
+    { "level": "Moderate", "minPercent": 21, "maxPercent": 40 },
+    { "level": "Elevated", "minPercent": 41, "maxPercent": 60 },
+    { "level": "High", "minPercent": 61, "maxPercent": 80 },
+    { "level": "Critical", "minPercent": 81, "maxPercent": 100 }
+  ],
+  "useCaseImpactMap": {
+    "Low": "Low impact",
+    "Moderate": "Moderate impact",
+    "Elevated": "Moderate impact",
+    "High": "High impact",
+    "Critical": "Critical impact"
+  }
+}
