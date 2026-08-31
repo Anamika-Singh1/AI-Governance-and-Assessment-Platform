@@ -1,4 +1,3 @@
-// 
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -16,24 +15,13 @@ import {
 } from "./middleware/errorHandler";
 import { auditLog } from "./middleware/auditLog";
 
-/**
- * Creates and configures the Express application.
- *
- * Keeping this as a function is useful for:
- * - Local development
- * - Automated tests
- * - Vercel deployment
- */
 export function createApp() {
   const app = express();
 
-  // Disable Express identification header
   app.disable("x-powered-by");
 
-  // Security headers
   app.use(helmet());
 
-  // CORS
   app.use(
     cors({
       origin: config.corsOrigin,
@@ -42,14 +30,12 @@ export function createApp() {
     })
   );
 
-  // JSON body parser
   app.use(
     express.json({
       limit: "256kb"
     })
   );
 
-  // Request logging
   app.use(
     morgan(
       config.nodeEnv === "test"
@@ -58,10 +44,8 @@ export function createApp() {
     )
   );
 
-  // Audit logging
   app.use(auditLog);
 
-  // Rate limiting
   const limiter = rateLimit({
     windowMs: 60 * 1000,
     limit: 60,
@@ -74,21 +58,23 @@ export function createApp() {
   });
 
   app.use("/api", limiter);
-// Root endpoint
-app.get("/", (_req, res) => {
-  res.json({
-    message: "AI Governance Assessment API is running",
-    health: "/api/health"
+
+  // Root route
+  app.get("/", (_req, res) => {
+    res.json({
+      status: "ok",
+      message: "AI Governance Assessment API is running",
+      health: "/api/health"
+    });
   });
-});
-  // Health endpoint
+
+  // Health route
   app.get("/api/health", (_req, res) => {
     res.json({
       status: "ok",
       version: config.assessmentEngineVersion
     });
   });
-  
 
   // API routes
   app.use("/api/use-cases", useCasesRouter);
@@ -96,20 +82,15 @@ app.get("/", (_req, res) => {
   app.use("/api/sources", sourcesRouter);
   app.use("/api", rulesRouter);
 
-  
-
-  // 404 handler
+  // 404
   app.use(notFoundHandler);
 
-  // Global error handler
+  // Error handler
   app.use(errorHandler);
 
   return app;
 }
 
-/**
- * Vercel needs the Express application as the default export.
- */
 const app = createApp();
 
 export default app;
