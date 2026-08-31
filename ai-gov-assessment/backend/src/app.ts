@@ -74,7 +74,13 @@ export function createApp() {
   });
 
   app.use("/api", limiter);
-
+// Root endpoint
+app.get("/", (_req, res) => {
+  res.json({
+    message: "AI Governance Assessment API is running",
+    health: "/api/health"
+  });
+});
   // Health endpoint
   app.get("/api/health", (_req, res) => {
     res.json({
@@ -82,12 +88,15 @@ export function createApp() {
       version: config.assessmentEngineVersion
     });
   });
+  
 
   // API routes
   app.use("/api/use-cases", useCasesRouter);
   app.use("/api/assessments", assessmentsRouter);
   app.use("/api/sources", sourcesRouter);
   app.use("/api", rulesRouter);
+
+  
 
   // 404 handler
   app.use(notFoundHandler);

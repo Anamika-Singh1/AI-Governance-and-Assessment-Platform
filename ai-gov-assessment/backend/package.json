@@ -1,8 +1,9 @@
+
 {
   "name": "ai-governance-assessment-backend",
   "version": "1.0.0",
   "description": "AI Governance Research & Assessment Application - Backend API",
-  "main": "dist/server.js",
+  "main": "dist/app.js",
   "type": "commonjs",
   "scripts": {
     "dev": "tsx watch src/server.ts",
