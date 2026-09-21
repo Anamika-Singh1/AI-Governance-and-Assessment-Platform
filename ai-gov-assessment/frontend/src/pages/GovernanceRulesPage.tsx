@@ -37,11 +37,11 @@ function formatCondition(c: RuleCondition): string {
 
 function ConditionExpression({ conditions, matchMode }: { conditions: RuleCondition[]; matchMode: "all" | "any" }) {
   if (conditions.length === 0) {
-    return <span className="font-mono text-xs text-slate-400">always applies (baseline)</span>;
+    return <span className="font-mono text-xs text-slate-400 dark:text-slate-400">always applies (baseline)</span>;
   }
   const joiner = matchMode === "any" ? " OR " : " AND ";
   return (
-    <span className="font-mono text-xs text-slate-500">
+    <span className="font-mono text-xs text-slate-500 dark:text-slate-400">
       IF {conditions.map((c) => formatCondition(c)).join(joiner)}
     </span>
   );
@@ -80,7 +80,7 @@ export function GovernanceRulesPage() {
   if (!data) {
     return (
       <AppShell title="Governance Rules">
-        <div className="flex h-64 items-center justify-center text-slate-400">
+        <div className="flex h-64 items-center justify-center text-slate-400 dark:text-slate-400">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       </AppShell>
@@ -125,15 +125,15 @@ export function GovernanceRulesPage() {
             {[...rulesByDimension.entries()].map(([dimensionKey, rules]) => (
               <div key={dimensionKey}>
                 <div className="mb-2 flex items-center gap-2">
-                  <h4 className="text-sm font-semibold text-slate-800">{DIMENSION_MAP[dimensionKey]?.label ?? dimensionKey}</h4>
+                  <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{DIMENSION_MAP[dimensionKey]?.label ?? dimensionKey}</h4>
                   <Badge className="text-[10px]">{rules.length} rule{rules.length === 1 ? "" : "s"}</Badge>
                 </div>
                 <div className="space-y-2">
                   {rules.map((r) => (
-                    <div key={r.id} className="rounded-lg border border-slate-200 p-3.5">
+                    <div key={r.id} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3.5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="font-medium text-slate-900">{r.name}</div>
-                        <Badge className={r.scoreDelta > 0 ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-slate-50 text-slate-500"}>
+                        <div className="font-medium text-slate-900 dark:text-slate-100">{r.name}</div>
+                        <Badge className={r.scoreDelta > 0 ? "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400" : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400"}>
                           {r.scoreDelta > 0 ? "+" : ""}
                           {r.scoreDelta}
                         </Badge>
@@ -141,13 +141,13 @@ export function GovernanceRulesPage() {
                       <div className="mt-1.5">
                         <ConditionExpression conditions={r.conditions} matchMode={r.matchMode} />
                       </div>
-                      <p className="mt-1.5 text-sm text-slate-600">{r.reason}</p>
+                      <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-300">{r.reason}</p>
                     </div>
                   ))}
                 </div>
               </div>
             ))}
-            {filteredGovernanceRules.length === 0 && <p className="text-sm text-slate-400">No rules match this filter.</p>}
+            {filteredGovernanceRules.length === 0 && <p className="text-sm text-slate-400 dark:text-slate-400">No rules match this filter.</p>}
           </CardContent>
         </Card>
 
@@ -161,19 +161,19 @@ export function GovernanceRulesPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {data.overrideRules.map((r) => (
-              <div key={r.id} className="rounded-lg border border-slate-200 p-3.5">
+              <div key={r.id} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="font-medium text-slate-900">
+                  <div className="font-medium text-slate-900 dark:text-slate-100">
                     {r.id} — {r.name}
                   </div>
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                     enforces min. <RiskBadge level={r.minRiskLevel} size="sm" />
                   </div>
                 </div>
                 <div className="mt-1.5">
                   <ConditionExpression conditions={r.conditions} matchMode={r.matchMode} />
                 </div>
-                <p className="mt-1.5 text-sm text-slate-600">{r.reason}</p>
+                <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-300">{r.reason}</p>
               </div>
             ))}
           </CardContent>
@@ -186,10 +186,10 @@ export function GovernanceRulesPage() {
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {data.regulatoryMappingRules.map((r) => (
-              <div key={r.sourceId} className="flex items-start justify-between gap-2 rounded-lg border border-slate-200 p-3 text-sm">
+              <div key={r.sourceId} className="flex items-start justify-between gap-2 rounded-lg border border-slate-200 dark:border-slate-700 p-3 text-sm">
                 <div>
-                  <div className="font-medium text-slate-800">{r.name}</div>
-                  <div className="mt-0.5 text-xs text-slate-500">{r.applicabilityConditions}</div>
+                  <div className="font-medium text-slate-800 dark:text-slate-100">{r.name}</div>
+                  <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{r.applicabilityConditions}</div>
                 </div>
                 <ArrowUpRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-300" />
               </div>

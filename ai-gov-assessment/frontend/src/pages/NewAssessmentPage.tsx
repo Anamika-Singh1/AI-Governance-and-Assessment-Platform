@@ -9,7 +9,6 @@ import { api, ApiError } from "@/lib/api";
 import { UseCaseInput } from "@/types/api";
 import { SAMPLE_USE_CASES } from "@/data/sampleUseCases";
 import { Loader2, Sparkles, ShieldQuestion } from "lucide-react";
-import { getApiKey } from "@/lib/settings";
 
 const EMPTY: UseCaseInput = {
   useCaseName: "",
@@ -46,49 +45,11 @@ export function NewAssessmentPage() {
     try {
       const result = await api.createUseCaseAndAssess(form);
       navigate(`/assessments/${result.useCaseId}`);
-    // } catch (err) {
-    //   if (err instanceof ApiError && err.status === 401) {
-    //     setError(
-    //       !getApiKey()
-    //         ? "Backend API key is not configured. Open Settings and configure the Backend API Key."
-    //         : "Backend authentication failed. Check that the Backend API Key in Settings matches the API_KEY configured in the backend .env."
-    //     );
-    //   } else if (err instanceof ApiError) {
-    //     setError(err.message + (err.details ? ` (${JSON.stringify(err.details).slice(0, 200)})` : ""));
-    //   } else {
-    //     setError("Something went wrong submitting the assessment.");
-    //   }
- //}
- } catch (err) {
-  console.error("ASSESSMENT SUBMISSION ERROR:", err);
-
-  if (err instanceof ApiError && err.status === 401) {
-    setError(
-      !getApiKey()
-        ? "Backend API key is not configured. Open Settings and configure the Backend API Key."
-        : "Backend authentication failed. Check that the Backend API Key in Settings matches the API_KEY configured in the backend .env."
-    );
-  } else if (err instanceof ApiError) {
-    console.error("API ERROR:", {
-      status: err.status,
-      message: err.message,
-      details: err.details,
-    });
-
-    setError(
-      err.message +
-        (err.details
-          ? ` (${JSON.stringify(err.details).slice(0, 200)})`
-          : "")
-    );
-  } else if (err instanceof Error) {
-    console.error("NETWORK/UNKNOWN ERROR:", err.message);
-    setError(`Request failed: ${err.message}`);
-  } else {
-    setError("Something went wrong submitting the assessment.");
-  }
-}
- finally {
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) setError("Your session expired. Please sign in again.");
+      else if (err instanceof ApiError) setError(err.message);
+      else setError("Something went wrong submitting the assessment.");
+    } finally {
       setSubmitting(false);
     }
   }
@@ -138,7 +99,7 @@ export function NewAssessmentPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <Label>Industry</Label>
                   <Input required value={form.industry} onChange={(e) => update("industry", e.target.value)} />
@@ -174,7 +135,7 @@ export function NewAssessmentPage() {
                 <Input required value={form.affectedParties} onChange={(e) => update("affectedParties", e.target.value)} placeholder="e.g. Retail loan applicants" />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <Label>Decision Type</Label>
                   <Select value={form.decisionType} onChange={(e) => update("decisionType", e.target.value as UseCaseInput["decisionType"])}>
@@ -195,9 +156,7 @@ export function NewAssessmentPage() {
               {error && <Alert variant="error" title="Could not run assessment">{error}</Alert>}
 
               <Alert variant="info" title="How this works">
-                An LLM (or the deterministic fallback, if no API key is configured server-side) only extracts entities and candidate risk factors from
-                your text. The risk score, thresholds, override rules, and final classification are always computed by the deterministic scoring engine —
-                never decided by the LLM.
+                The AI model reviews your use case and available source references to generate scores, risk levels, explanations, and recommendations. Each run is saved and may produce different judgments.
               </Alert>
 
               <Button type="submit" size="lg" className="w-full" disabled={submitting}>

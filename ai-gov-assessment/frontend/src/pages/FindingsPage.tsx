@@ -9,7 +9,8 @@ import { api } from "@/lib/api";
 import { Assessment, FindingRecord, RiskLevel, SourceRecord, SourceType } from "@/types/api";
 import { DIMENSIONS } from "@/data/dimensions";
 import { SOURCE_TYPES } from "@/data/sourceTypes";
-import { Loader2 } from "lucide-react";
+import { FileDown, Loader2 } from "lucide-react";
+import { jsPDF } from "jspdf";
 
 const RISK_LEVELS: RiskLevel[] = ["Low", "Moderate", "Elevated", "High", "Critical"];
 
@@ -60,6 +61,37 @@ export function FindingsPage() {
     });
   }, [assessment, riskFilter, dimensionFilter, sourceTypeFilter, jurisdictionFilter]);
 
+  function exportPdf() {
+    if (!assessment) return;
+    const document = new jsPDF();
+    document.setFontSize(18);
+    document.text("AI Governance Findings", 14, 18);
+    document.setFontSize(10);
+    document.setTextColor(90);
+    document.text(assessment.useCaseName, 14, 26);
+    document.text(`Risk: ${assessment.riskLevel} | Score: ${assessment.overallScore}/${assessment.maxScore}`, 14, 32);
+    document.setTextColor(30);
+
+    let y = 44;
+    filtered.forEach((finding) => {
+      if (y > 260) {
+        document.addPage();
+        y = 18;
+      }
+      const dimension = DIMENSIONS.find((item) => item.key === finding.dimension)?.label || finding.dimension;
+      document.setFont("helvetica", "bold");
+      document.text(`${dimension} — ${finding.severity} (${finding.score}/5)`, 14, y);
+      document.setFont("helvetica", "normal");
+      y += 6;
+      document.splitTextToSize(finding.explanation, 180).forEach((line: string) => {
+        document.text(line, 14, y);
+        y += 5;
+      });
+      y += 5;
+    });
+    document.save("assessment-findings.pdf");
+  }
+
   return (
     <AppShell title="Findings" subtitle="Detailed, evidence-backed findings for every governance dimension of a selected assessment.">
       <div className="space-y-5">
@@ -78,7 +110,7 @@ export function FindingsPage() {
             <div>
               <Label>Risk Level</Label>
               <Select value={riskFilter} onChange={(e) => setRiskFilter(e.target.value)}>
-                <option value="">All levels</option>
+                <option value="">All</option>
                 {RISK_LEVELS.map((l) => (
                   <option key={l} value={l}>
                     {l}
@@ -89,7 +121,7 @@ export function FindingsPage() {
             <div>
               <Label>Dimension</Label>
               <Select value={dimensionFilter} onChange={(e) => setDimensionFilter(e.target.value)}>
-                <option value="">All dimensions</option>
+                <option value="">All</option>
                 {DIMENSIONS.map((d) => (
                   <option key={d.key} value={d.key}>
                     {d.label}
@@ -100,7 +132,7 @@ export function FindingsPage() {
             <div>
               <Label>Source Type</Label>
               <Select value={sourceTypeFilter} onChange={(e) => setSourceTypeFilter(e.target.value)}>
-                <option value="">All source types</option>
+                <option value="">All</option>
                 {SOURCE_TYPES.map((t) => (
                   <option key={t} value={t}>
                     {t}
@@ -111,7 +143,7 @@ export function FindingsPage() {
             <div>
               <Label>Jurisdiction</Label>
               <Select value={jurisdictionFilter} onChange={(e) => setJurisdictionFilter(e.target.value)}>
-                <option value="">All jurisdictions</option>
+                <option value="">All</option>
                 {jurisdictions.map((j) => (
                   <option key={j} value={j}>
                     {j}
@@ -123,27 +155,32 @@ export function FindingsPage() {
         </Card>
 
         {loading && (
-          <div className="flex h-40 items-center justify-center text-slate-400">
+          <div className="flex h-40 items-center justify-center text-slate-400 dark:text-slate-400">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
         )}
 
         {!loading && assessment && (
           <>
-            <p className="text-sm text-slate-500">
-              Showing {filtered.length} of {assessment.findings.length} findings for <span className="font-medium text-slate-700">{assessment.useCaseName}</span>
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Showing {filtered.length} of {assessment.findings.length} findings for <span className="font-medium text-slate-700 dark:text-slate-200">{assessment.useCaseName}</span>
+              </p>
+              <button type="button" className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-950 disabled:cursor-not-allowed disabled:opacity-50" onClick={exportPdf} disabled={filtered.length === 0} title="Download filtered findings as PDF">
+                <FileDown className="h-4 w-4" /> Download PDF
+              </button>
+            </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {filtered.map((f) => (
                 <FindingCard key={f.dimension} finding={f} sourceMap={sourceMap} />
               ))}
             </div>
-            {filtered.length === 0 && <p className="text-sm text-slate-400">No findings match the current filters.</p>}
+            {filtered.length === 0 && <p className="text-sm text-slate-400 dark:text-slate-400">No findings match the current filters.</p>}
           </>
         )}
 
         {!loading && !assessment && items.length === 0 && (
-          <p className="text-sm text-slate-400">No assessments yet — run one from New Assessment to see findings here.</p>
+          <p className="text-sm text-slate-400 dark:text-slate-400">No assessments yet — run one from New Assessment to see findings here.</p>
         )}
       </div>
     </AppShell>

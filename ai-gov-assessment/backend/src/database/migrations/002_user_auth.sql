@@ -1,0 +1,6 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT '';
+UPDATE users SET password_hash = 'DISABLED' WHERE password_hash IS NULL;
+ALTER TABLE users ALTER COLUMN password_hash SET NOT NULL;
+ALTER TABLE users ALTER COLUMN role SET DEFAULT 'ASSESSOR';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users (lower(email));

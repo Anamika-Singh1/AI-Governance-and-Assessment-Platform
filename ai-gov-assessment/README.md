@@ -2,7 +2,7 @@
 
 A full-stack platform that takes a natural-language description of an AI use case (real or entirely new) and produces a **repeatable, evidence-based AI governance assessment** — deterministic risk scoring across 10 governance dimensions, a data-driven governance rule engine, a real RAG retrieval pipeline over a curated source library, regulatory mapping to public sources, and a full audit trail. Built around Financial Services / Banking as the seeded industry, with the schema and rule engine designed to extend to others as data, not code.
 
-This app deliberately does **not** ask an LLM "is this high risk?" — see [Assessment Methodology](docs/assessment-methodology.md).
+New assessments use OpenAI directly. Earlier rule-engine documentation below describes the legacy implementation; it does not control new LLM results. See [LLM assessment setup](docs/llm-assessments.md) for the current pipeline.
 
 For full technical documentation beyond this overview, see the [`docs/`](docs/) folder: [architecture.md](docs/architecture.md), [database.md](docs/database.md), [assessment-methodology.md](docs/assessment-methodology.md), [ai-and-rag.md](docs/ai-and-rag.md), and [source-and-licence-inventory.md](docs/source-and-licence-inventory.md).
 
@@ -82,7 +82,7 @@ frontend/src/
  │                       # Sources, History, Methodology, Settings
  ├── components/         # RiskBadge, DimensionChart (radar/bar), FindingCard,
  │                       # RegulatoryMappingTable, TriggeredRulesList, AuditTrailList, ui/*
- ├── lib/                # api client, settings (localStorage), risk color helpers
+ ├── lib/                # cookie-authenticated API client, auth context, preferences
  ├── data/                # dimension + source-type metadata, sample use cases (for quick-start)
  └── types/               # TypeScript mirror of backend domain types
 ```
@@ -100,7 +100,7 @@ This starts Postgres + pgvector (`pgvector/pgvector:pg16`), a one-shot `db-init`
 
 > **Note on this repository's own build environment**: this project's Dockerfiles and `docker-compose.yml` were validated for correctness (`docker compose config`, and the exact `npm run build` / `node dist/server.js` / `vite build` steps each image runs) inside the sandbox this was developed in, but a full `docker compose up` could not be executed there because that sandbox blocks all container-registry traffic (Docker Hub, ghcr.io, mcr.microsoft.com all return `403 Forbidden` — the same class of restriction documented in [ai-and-rag.md](docs/ai-and-rag.md) for HuggingFace). Run `docker compose up --build` in a normal environment with registry access as the final verification step.
 
-Open `http://localhost:5173`, go to **Settings**, and enter the `API_KEY` from your `.env` (default `changeme-local-dev-key`).
+Open `http://localhost:5173` and sign in with the seeded demo account: `demo@aigov.local` / `Demo@12345`. Change `DEMO_PASSWORD` before seeding any shared environment. Users never enter backend URLs or API keys in the browser.
 
 ### Option B: Manual local setup
 
@@ -116,12 +116,12 @@ npm run db:migrate                   # applies the schema (requires psql on PATH
 npm run db:seed                      # seeds dimensions, 15 curated sources, 43 governance rules, 7 override rules
 
 # 2. Backend
-npm run dev                          # http://localhost:4000
+cd ..
+npm install                          # installs the root concurrently launcher
+npm run dev                          # starts both services
 
-# 3. Frontend (separate terminal)
-cd ../frontend
-npm install
-npm run dev                          # http://localhost:5173
+# Frontend: http://localhost:5173/
+# Backend:  http://localhost:4000/
 ```
 
 **LLM provider keys never reach the frontend** — they are read only by the backend process. With `LLM_PROVIDER=deterministic` (the default) the app runs a fully rule-based text extractor with zero external API keys or network calls. Setting `LLM_PROVIDER=local` and `LOCAL_LLM_URL` points the extraction step at any OpenAI-chat-completions-compatible local server (Ollama, LM Studio, vLLM) instead of a hosted vendor.
@@ -183,9 +183,9 @@ The curated source library (15 sources spanning all 6 classification tiers and m
 **New sources can be added by CSV, with no code change or redeploy**, two ways:
 
 ```bash
-# Via the API (requires the bearer API key)
+# Via the API (requires an authenticated ADMIN session)
 curl -X POST http://localhost:4000/api/sources/import \
-  -H "Authorization: Bearer $API_KEY" \
+  -b cookies.txt \
   -H "Content-Type: text/csv" \
   --data-binary @backend/samples/sources-import-example.csv
 
@@ -201,20 +201,25 @@ CSV columns: `id` (optional — slugified from `title` if blank), `title`, `url`
 ```
 GET    /api/health
 
-POST   /api/use-cases                   (requires Authorization: Bearer <API_KEY>) — structure a use case (LLM/deterministic extraction, persisted once)
+POST   /api/auth/register
+POST   /api/auth/login
+POST   /api/auth/logout
+GET    /api/auth/me
+
+POST   /api/use-cases                   (requires authenticated session) — structure a use case (LLM/deterministic extraction, persisted once)
 GET    /api/use-cases
 GET    /api/use-cases/:id
 
-POST   /api/assessments                 (requires Authorization: Bearer <API_KEY>, body: {useCaseId}) — score a structured use case
+POST   /api/assessments                 (requires authenticated session, body: {useCaseId}) — score a structured use case
 GET    /api/assessments
 GET    /api/assessments/:id
-POST   /api/assessments/:id/run         (requires Authorization: Bearer <API_KEY>) — re-score from stored signals, no LLM call
+POST   /api/assessments/:id/run         (requires authenticated session) — re-score from stored signals, no LLM call
 GET    /api/assessments/:id/findings
 GET    /api/assessments/:id/sources
 GET    /api/assessments/:id/dimensions
 
 GET    /api/sources                     (?sourceType=&jurisdiction=)
-POST   /api/sources/import              (requires Authorization: Bearer <API_KEY>) — CSV source import, see §7
+POST   /api/sources/import              (requires authenticated session) — CSV source import, see §7
 
 GET    /api/rules
 GET    /api/methodology
@@ -223,8 +228,8 @@ GET    /api/methodology
 ## 9. Security
 
 - `helmet` for secure HTTP headers, `zod` schema validation on every write endpoint, a 60 req/min rate limiter on `/api/*`, parameterized queries throughout (no raw SQL string interpolation).
-- Simple bearer-token auth (`API_KEY`) gates write endpoints — appropriate for single-tenant local/demo use, not a substitute for real user authentication (the `users` table exists in the schema for exactly this future work; see [architecture.md](docs/architecture.md#multi-tenancy-and-auth-current-state-honestly-scoped)).
-- **LLM provider keys never leave the backend process** — the frontend only ever sends its own lightweight app-level key, stored in `localStorage`, never baked into the built JS bundle.
+- Email/password authentication gates write endpoints using short-lived JWT sessions in `HttpOnly` cookies. Browser JavaScript cannot read the session token, and logout clears it server-side.
+- **LLM provider keys never leave the backend process**. The frontend stores only non-sensitive preferences in `localStorage`; API location comes from deployment configuration.
 - Every request gets a UUID, echoed as `X-Request-Id`, logged as structured JSON, and persisted to an `audit_logs` table — an incorrect result can be traced end-to-end from that id.
 - Centralized error handling that never leaks stack traces to the client.
 

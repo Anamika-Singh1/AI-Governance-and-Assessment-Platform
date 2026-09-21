@@ -45,15 +45,16 @@ function rowToStoredUseCase(uc: any): StoredUseCase {
  * which is both cheaper and what keeps re-scoring reproducible even
  * when LLM_PROVIDER is a live, non-deterministic model.
  */
-export async function createUseCase(input: UseCaseInput, signals: ExtractedSignals): Promise<StoredUseCase> {
+export async function createUseCase(input: UseCaseInput, signals: ExtractedSignals, userId: string): Promise<StoredUseCase> {
   const structured = buildStructuredUseCase(input, signals);
   const res = await pgPool.query(
-    `INSERT INTO use_cases (tenant_id, name, description, industry_label, intended_users, purpose, data_used,
+    `INSERT INTO use_cases (tenant_id, created_by, name, description, industry_label, intended_users, purpose, data_used,
        affected_people, decision_type, human_review, region, extracted_json, raw_signals, extraction_method)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
      RETURNING *`,
     [
       DEFAULT_TENANT_ID,
+      userId,
       input.useCaseName,
       input.description,
       input.industry,
@@ -72,9 +73,9 @@ export async function createUseCase(input: UseCaseInput, signals: ExtractedSigna
   return rowToStoredUseCase(res.rows[0]);
 }
 
-export async function getUseCaseById(id: string): Promise<StoredUseCase | null> {
+export async function getUseCaseById(id: string, userId?: string): Promise<StoredUseCase | null> {
   if (!UUID_RE.test(id)) return null;
-  const res = await pgPool.query(`SELECT * FROM use_cases WHERE id = $1`, [id]);
+  const res = await pgPool.query(`SELECT * FROM use_cases WHERE id = $1 AND ($2::uuid IS NULL OR created_by = $2)`, [id, userId || null]);
   return res.rows[0] ? rowToStoredUseCase(res.rows[0]) : null;
 }
 
@@ -89,7 +90,7 @@ export interface UseCaseListItem {
   latestRiskLevel: string | null;
 }
 
-export async function listUseCases(limit = 50, offset = 0): Promise<{ items: UseCaseListItem[]; total: number }> {
+export async function listUseCases(limit = 50, offset = 0, userId?: string): Promise<{ items: UseCaseListItem[]; total: number }> {
   const [rowsRes, countRes] = await Promise.all([
     pgPool.query(
       `SELECT uc.id, uc.name, uc.industry_label, uc.region, uc.decision_type, uc.created_at,
@@ -97,12 +98,13 @@ export async function listUseCases(limit = 50, offset = 0): Promise<{ items: Use
               (SELECT risk_level FROM assessments WHERE use_case_id = uc.id ORDER BY created_at DESC LIMIT 1) AS latest_risk_level
        FROM use_cases uc
        LEFT JOIN assessments a ON a.use_case_id = uc.id
+       WHERE ($3::uuid IS NULL OR uc.created_by = $3)
        GROUP BY uc.id
        ORDER BY uc.created_at DESC
        LIMIT $1 OFFSET $2`,
-      [limit, offset]
+      [limit, offset, userId || null]
     ),
-    pgPool.query(`SELECT COUNT(*)::int AS total FROM use_cases`)
+    pgPool.query(`SELECT COUNT(*)::int AS total FROM use_cases WHERE ($1::uuid IS NULL OR created_by = $1)`, [userId || null])
   ]);
 
   return {

@@ -29,9 +29,8 @@ const RELEVANCE_THRESHOLD = 0.12;
 const TOP_K = 3;
 
 /**
- * Real RAG retrieval: embed a dimension-focused query built from the
- * use case + the dimension's own definition, semantically search
- * source_chunks via pgvector cosine distance, optionally boosted by
+ * Embed a dimension-focused query built from the use case and dimension,
+ * search the normalized array embeddings by cosine similarity, boosted by
  * chunks pre-tagged as relevant to this dimension. Every result keeps
  * its full source metadata and similarity score — nothing here is
  * paraphrased or invented; what's retrieved is exactly what's returned.
@@ -48,20 +47,30 @@ export async function retrieveEvidenceForDimension(
     input.purpose
   ].join(". ");
   const queryVector = embeddingProvider.embed(queryText);
-  const vectorLiteral = `[${queryVector.join(",")}]`;
 
-  const res = await pgPool.query(
-    `SELECT sc.id AS source_chunk_id, sc.content, sc.source_id,
-            s.title, s.publisher, s.url, s.source_type, s.jurisdiction,
-            s.authority_level, s.status,
-            1 - (sc.embedding <=> $1::vector) AS similarity,
-            (sc.dimension_tags @> to_jsonb($2::text)) AS dimension_tagged
-     FROM source_chunks sc
-     JOIN sources s ON s.id = sc.source_id
-     ORDER BY dimension_tagged DESC, sc.embedding <=> $1::vector
-     LIMIT $3`,
-    [vectorLiteral, dimension.key, TOP_K]
-  );
+  let res;
+  try {
+    res = await pgPool.query(
+      `SELECT sc.id AS source_chunk_id, sc.content, sc.source_id,
+              s.title, s.publisher, s.url, s.source_type, s.jurisdiction,
+              s.authority_level, s.status,
+              similarity.score AS similarity,
+              (sc.dimension_tags @> to_jsonb($2::text)) AS dimension_tagged
+       FROM source_chunks sc
+       JOIN sources s ON s.id = sc.source_id
+       CROSS JOIN LATERAL (
+         SELECT SUM(value * ($1::double precision[])[position]) AS score
+         FROM unnest(sc.embedding) WITH ORDINALITY AS component(value, position)
+       ) similarity
+       WHERE similarity.score >= $4
+       ORDER BY dimension_tagged DESC, similarity.score DESC, sc.id
+       LIMIT $3`,
+      [queryVector, dimension.key, TOP_K, RELEVANCE_THRESHOLD]
+    );
+  } catch (error: any) {
+    if (error?.code === "42P01") return [];
+    throw error;
+  }
 
   return res.rows
     .filter((r) => Number(r.similarity) >= RELEVANCE_THRESHOLD)

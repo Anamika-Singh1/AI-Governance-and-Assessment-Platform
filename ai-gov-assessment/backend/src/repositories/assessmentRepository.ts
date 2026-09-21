@@ -5,6 +5,11 @@ import { computeRegulatoryMapping } from "../services/research/regulatoryMapping
 
 const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
+async function hasSourceChunksTable(): Promise<boolean> {
+  const result = await pgPool.query("SELECT to_regclass('public.source_chunks') AS table_name");
+  return Boolean(result.rows[0]?.table_name);
+}
+
 /**
  * Persists an assessment RUN against an ALREADY-EXISTING use case
  * (created separately via useCaseRepository.createUseCase — see
@@ -20,12 +25,13 @@ export async function saveAssessment(
   const client = await pgPool.connect();
   try {
     await client.query("BEGIN");
+    const sourceChunksAvailable = await hasSourceChunksTable();
 
     const asRes = await client.query(
       `INSERT INTO assessments (tenant_id, use_case_id, overall_score, max_score, risk_percentage, risk_level,
          impact_level, required_human_oversight, extraction_method, rules_version, engine_version,
-         llm_provider_used, triggered_override_rules, audit_trail)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+         llm_provider_used, triggered_override_rules, audit_trail, result_snapshot)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING id, created_at`,
       [
         DEFAULT_TENANT_ID,
@@ -41,7 +47,8 @@ export async function saveAssessment(
         result.assessmentEngineVersion,
         result.llmProviderUsed,
         JSON.stringify(result.triggeredRules),
-        JSON.stringify(auditTrail)
+        JSON.stringify(auditTrail),
+        JSON.stringify(result)
       ]
     );
     const assessmentId = asRes.rows[0].id;
@@ -64,13 +71,15 @@ export async function saveAssessment(
       // relevance score isn't preserved at this call site (see retrievalService for the
       // live similarity score at retrieval time) — this join exists primarily so future
       // queries can trace "which chunk(s) grounded this dimension's score."
-      for (const sourceId of d.sourceIds) {
-        const chunk = await client.query(`SELECT id FROM source_chunks WHERE source_id = $1 ORDER BY chunk_index LIMIT 1`, [sourceId]);
-        if (chunk.rows[0]) {
-          await client.query(
-            `INSERT INTO evidence (assessment_dimension_id, source_chunk_id, relevance_score) VALUES ($1,$2,$3)`,
-            [assessmentDimensionId, chunk.rows[0].id, 0]
-          );
+      if (sourceChunksAvailable) {
+        for (const sourceId of d.sourceIds) {
+          const chunk = await client.query(`SELECT id FROM source_chunks WHERE source_id = $1 ORDER BY chunk_index LIMIT 1`, [sourceId]);
+          if (chunk.rows[0]) {
+            await client.query(
+              `INSERT INTO evidence (assessment_dimension_id, source_chunk_id, relevance_score) VALUES ($1,$2,$3)`,
+              [assessmentDimensionId, chunk.rows[0].id, 0]
+            );
+          }
         }
       }
     }
@@ -99,14 +108,14 @@ async function loadLatestAssessment(useCaseId: string): Promise<{ assessmentId: 
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function getAssessmentById(useCaseId: string): Promise<StoredAssessment | null> {
+export async function getAssessmentById(useCaseId: string, userId?: string): Promise<StoredAssessment | null> {
   // An id that isn't even a well-formed UUID can never match a row —
   // return "not found" rather than letting Postgres reject the query
   // with a type error (22P02), which the error middleware would
   // otherwise surface as a 500 instead of a clean 404.
   if (!UUID_RE.test(useCaseId)) return null;
 
-  const ucRes = await pgPool.query(`SELECT * FROM use_cases WHERE id = $1`, [useCaseId]);
+  const ucRes = await pgPool.query(`SELECT * FROM use_cases WHERE id = $1 AND ($2::uuid IS NULL OR created_by = $2)`, [useCaseId, userId || null]);
   if (!ucRes.rows[0]) return null;
   const uc = ucRes.rows[0];
 
@@ -114,13 +123,29 @@ export async function getAssessmentById(useCaseId: string): Promise<StoredAssess
   if (!latest) return null;
   const a = latest.row;
 
+  if (a.result_snapshot) {
+    return {
+      ...a.result_snapshot,
+      useCaseId: uc.id, useCaseName: uc.name, description: uc.description,
+      industry: uc.industry_label, intendedUsers: uc.intended_users, dataUsed: uc.data_used,
+      purpose: uc.purpose, affectedParties: uc.affected_people, decisionType: uc.decision_type,
+      humanReview: uc.human_review, region: uc.region,
+      auditTrail: a.audit_trail, createdAt: uc.created_at.toISOString(), updatedAt: a.created_at.toISOString()
+    };
+  }
+
+  const sourceChunksAvailable = await hasSourceChunksTable();
   const dimRes = await pgPool.query(
-    `SELECT ad.*, array_remove(array_agg(DISTINCT sc.source_id), NULL) AS source_ids
-     FROM assessment_dimensions ad
-     LEFT JOIN evidence ev ON ev.assessment_dimension_id = ad.id
-     LEFT JOIN source_chunks sc ON sc.id = ev.source_chunk_id
-     WHERE ad.assessment_id = $1
-     GROUP BY ad.id`,
+    sourceChunksAvailable
+      ? `SELECT ad.*, array_remove(array_agg(DISTINCT sc.source_id), NULL) AS source_ids
+         FROM assessment_dimensions ad
+         LEFT JOIN evidence ev ON ev.assessment_dimension_id = ad.id
+         LEFT JOIN source_chunks sc ON sc.id = ev.source_chunk_id
+         WHERE ad.assessment_id = $1
+         GROUP BY ad.id`
+      : `SELECT ad.*, ARRAY[]::text[] AS source_ids
+         FROM assessment_dimensions ad
+         WHERE ad.assessment_id = $1`,
     [latest.assessmentId]
   );
 
@@ -197,12 +222,14 @@ export async function getAssessmentById(useCaseId: string): Promise<StoredAssess
   };
 }
 
-export async function listAssessments(): Promise<AssessmentListItem[]> {
+export async function listAssessments(userId?: string): Promise<AssessmentListItem[]> {
   const res = await pgPool.query(
     `SELECT DISTINCT ON (uc.id) uc.id AS use_case_id, uc.name, uc.industry_label, uc.region, a.overall_score, a.risk_level, a.risk_percentage, a.created_at
      FROM use_cases uc
      JOIN assessments a ON a.use_case_id = uc.id
+     WHERE ($1::uuid IS NULL OR uc.created_by = $1)
      ORDER BY uc.id, a.created_at DESC`
+    , [userId || null]
   );
   // Re-sort by most recent first (the DISTINCT ON above requires ordering by uc.id first)
   const rows = [...res.rows].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -221,6 +248,11 @@ export async function listAssessments(): Promise<AssessmentListItem[]> {
 export async function getDimensionsForAssessment(useCaseId: string): Promise<StoredDimension[]> {
   const latest = await loadLatestAssessment(useCaseId);
   if (!latest) return [];
+  if (latest.row.result_snapshot) {
+    return latest.row.result_snapshot.dimensionAssessments.map((d: StoredDimension) => ({
+      ...d, assessmentId: useCaseId, createdAt: latest.row.created_at.toISOString()
+    }));
+  }
   const dimRes = await pgPool.query(
     `SELECT * FROM assessment_dimensions WHERE assessment_id = $1`,
     [latest.assessmentId]

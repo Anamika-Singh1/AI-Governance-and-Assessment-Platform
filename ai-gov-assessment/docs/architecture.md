@@ -10,7 +10,7 @@ The application is a monorepo with two deployables and one shared datastore:
 
 ```mermaid
 flowchart TB
-    Browser["Browser — React SPA\n(bearer token from Settings, localStorage)"]
+    Browser["Browser — React SPA\n(HttpOnly cookie session)"]
 
     subgraph Backend["Express API (backend)"]
         UCS["Use Case Service"]
@@ -61,7 +61,7 @@ Both the LLM layer and the embedding layer follow the same shape: an interface (
 
 ## Multi-tenancy and auth (current state, honestly scoped)
 
-Every business table carries `tenant_id`, and all writes go through it (`DEFAULT_TENANT_ID`, a single seeded tenant). This means onboarding a second tenant is a data change, not a schema change — the intended design goal. What is **not** yet implemented: per-request tenant resolution and enforcement on read queries, or real user authentication. The API is protected by a single shared bearer token (`API_KEY`) on write endpoints, which is appropriate for a single-tenant demo but is not multi-tenant isolation. Turning this on for real is: resolve `tenant_id` from an authenticated session (the `users` table already exists for this), and add `WHERE tenant_id = $1` to every read query that doesn't already have it.
+Every business table carries `tenant_id`. Users authenticate with email/password and receive a short-lived JWT in an `HttpOnly` cookie; roles are `ADMIN`, `ASSESSOR`, `REVIEWER`, and `VIEWER`. The current POC still uses one seeded tenant for assessment repositories. The next multi-tenant hardening step is to pass the authenticated session's `tenantId` into every repository query and enforce it on all reads and writes.
 
 ## Observability
 

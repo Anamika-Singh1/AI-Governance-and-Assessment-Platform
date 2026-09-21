@@ -11,6 +11,7 @@ import { CURATED_SOURCES } from "../rules/authoritativeSources";
 import { embeddingProvider } from "../services/embeddings/hashingEmbeddingProvider";
 import { upsertSourceAndChunks } from "../services/sources/sourceUpsert";
 import overrideRulesConfig from "../rules/overrideRules.json";
+import bcrypt from "bcryptjs";
 
 const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -162,6 +163,13 @@ async function seed() {
       [DEFAULT_TENANT_ID]
     );
 
+    const demoPasswordHash = await bcrypt.hash(process.env.DEMO_PASSWORD || "Demo@12345", 12);
+    await client.query(
+      `INSERT INTO users (tenant_id,email,password_hash,name,role) VALUES ($1,'demo@aigov.local',$2,'Demo Assessor','ASSESSOR')
+       ON CONFLICT (tenant_id,email) DO UPDATE SET password_hash=$2,name='Demo Assessor',role='ASSESSOR'`,
+      [DEFAULT_TENANT_ID,demoPasswordHash]
+    );
+
     for (const [i, d] of DIMENSIONS.entries()) {
       await client.query(
         `INSERT INTO dimensions (key, label, short_label, description, evaluation_criteria, recommended_controls, max_score, sort_order)
@@ -180,12 +188,17 @@ async function seed() {
     );
     const industryId = industryRes.rows[0].id;
 
+    const sourceChunksAvailable = Boolean((await client.query("SELECT to_regclass('public.source_chunks') AS table_name")).rows[0]?.table_name);
     let chunkCount = 0;
-    for (const s of CURATED_SOURCES) {
-      const { chunksWritten } = await upsertSourceAndChunks(client, s);
-      chunkCount += chunksWritten;
+    if (sourceChunksAvailable) {
+      for (const s of CURATED_SOURCES) {
+        const { chunksWritten } = await upsertSourceAndChunks(client, s);
+        chunkCount += chunksWritten;
+      }
+      console.log(`Seeded ${CURATED_SOURCES.length} sources, ${chunkCount} chunks (embedded via ${embeddingProvider.name}).`);
+    } else {
+      throw new Error("Research tables are missing. Run npm run db:repair-research, then run db:seed again.");
     }
-    console.log(`Seeded ${CURATED_SOURCES.length} sources, ${chunkCount} chunks (embedded via ${embeddingProvider.name}).`);
 
     await client.query(`DELETE FROM governance_rules WHERE tenant_id = $1`, [DEFAULT_TENANT_ID]);
     for (const r of GOVERNANCE_RULES) {

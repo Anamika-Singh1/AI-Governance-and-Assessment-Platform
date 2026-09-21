@@ -38,7 +38,7 @@ export async function getMethodologyHandler(_req: Request, res: Response) {
     assessmentEngineVersion: config.assessmentEngineVersion,
     sourceHierarchy: SOURCE_HIERARCHY_ORDER.map((t) => ({ sourceType: t, ...SOURCE_TYPE_RELIABILITY[t] })),
     aiUsageStatement:
-      "This application uses AI (LLM) only to interpret free-text input, extract entities, identify candidate risk factors and candidate regulations, and generate natural-language summaries. All scores, thresholds, override-rule evaluation, final risk classification, and required controls are computed by a deterministic, versioned rules engine reading from Postgres — never by the LLM. This design keeps assessments repeatable: identical input always produces identical scores.",
+      "The LLM generates dimension scores, risk levels, explanations, controls and regulatory applicability from the use case and supplied source references. The app validates output and calculates totals. New runs may differ. Thresholds and override rules shown here are legacy reference data, not applied to new LLM assessments.",
     legalDisclaimer:
       "This application provides governance research and risk-assessment support. It does not provide legal advice. Regulatory mapping indicates potential applicability only; consult qualified legal counsel to confirm applicability for any specific deployment."
   });

@@ -9,10 +9,10 @@ import { createUseCase as persistUseCase, getUseCaseById, listUseCases, StoredUs
  * persisted so every later assessment run reuses it instead of calling
  * the LLM again.
  */
-export async function createUseCase(input: UseCaseInput): Promise<StoredUseCase> {
+export async function createUseCase(input: UseCaseInput, userId: string): Promise<StoredUseCase> {
   const provider = getLLMProvider();
   const signals = await provider.extractSignals(input);
-  return persistUseCase(input, signals);
+  return persistUseCase(input, signals, userId);
 }
 
 export { getUseCaseById, listUseCases };

@@ -1,5 +1,5 @@
 import { Assessment, AssessmentListItem, FindingRecord, MethodologyResponse, RulesResponse, SourceRecord, SourceType, UseCaseInput, UseCaseRecord, UseCaseListItem } from "@/types/api";
-import { getApiBaseUrl, getApiKey } from "./settings";
+import { getApiBaseUrl } from "./settings";
 
 export class ApiError extends Error {
   status: number;
@@ -11,41 +11,36 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, opts: RequestInit = {}, auth = false): Promise<T> {
+async function request<T>(path: string, opts: RequestInit = {}, _auth = false): Promise<T> {
   const base = getApiBaseUrl();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...((opts.headers as Record<string, string>) || {})
   };
-  // if (auth) {
-  //   const key = getApiKey();
-  //   if (key) headers["Authorization"] = `Bearer ${key}`;
-  // }
-if (auth) {
-  const key = getApiKey();
-
-  console.log("API KEY EXISTS:", !!key);
-  console.log("API KEY LENGTH:", key?.length);
-  console.log("API KEY:", key);
-  console.log("AUTH HEADER:", `Bearer ${key}`);
-
-  if (!key) {
-    throw new ApiError("Backend API key is not configured", 401);
-  }
-
-  headers["Authorization"] = `Bearer ${key}`;
-}
-  const res = await fetch(`${base}${path}`, { ...opts, headers });
+  const res = await fetch(`${base}${path}`, { ...opts, headers, credentials: "include" });
   const isJson = res.headers.get("content-type")?.includes("application/json");
   const body = isJson ? await res.json().catch(() => null) : null;
   if (!res.ok) {
-    throw new ApiError(body?.message || `Request failed with status ${res.status}`, res.status, body?.details);
+    const validationMessages = body?.error === "VALIDATION_ERROR" && Array.isArray(body.details)
+      ? body.details.flatMap((issue: { path?: unknown; message?: unknown } | null) => {
+          if (!issue || typeof issue.message !== "string") return [];
+          const field = Array.isArray(issue.path) ? issue.path.join(".") : "";
+          return [field ? `${field}: ${issue.message}` : issue.message];
+        }).join(" ")
+      : "";
+    throw new ApiError(validationMessages || body?.message || `Request failed with status ${res.status}`, res.status, body?.details);
   }
   return body as T;
 }
 
 export const api = {
   health: () => request<{ status: string; version: string }>("/api/health"),
+  register: (input: {name:string;email:string;password:string}) => request<{user: AuthUser}>("/api/auth/register", {method:"POST",body:JSON.stringify(input)}),
+  login: (input: {email:string;password:string}) => request<{user: AuthUser}>("/api/auth/login", {method:"POST",body:JSON.stringify(input)}),
+  forgotPassword: (email: string) => request<{message:string;resetToken?:string}>("/api/auth/forgot-password", {method:"POST",body:JSON.stringify({email})}),
+  resetPassword: (token: string, password: string) => request<{user: AuthUser}>("/api/auth/reset-password", {method:"POST",body:JSON.stringify({token,password})}),
+  logout: () => request<void>("/api/auth/logout", {method:"POST"}),
+  me: () => request<{user: AuthUser}>("/api/auth/me"),
 
   // "Use Case Management" (create + structure) is now a separate step from
   // "Assessment Engine" (score) — matching the assignment's own module
@@ -105,3 +100,5 @@ export const api = {
 
   getMethodology: () => request<MethodologyResponse>("/api/methodology")
 };
+
+export interface AuthUser { id:string; tenantId:string; email:string; name:string; role:"ADMIN"|"ASSESSOR"|"REVIEWER"|"VIEWER" }

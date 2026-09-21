@@ -21,25 +21,25 @@ export function FindingCard({ finding, sourceMap }: { finding: FindingRecord; so
     <Card>
       <CardHeader className="flex-row items-start justify-between space-y-0 gap-3">
         <div>
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{dim?.label || finding.dimension}</div>
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-400">{dim?.label || finding.dimension}</div>
           <div className="mt-1 flex items-center gap-2">
-            <span className="text-2xl font-bold text-slate-900">{finding.score}</span>
-            <span className="text-sm text-slate-400">/ 5</span>
+            <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{finding.score}</span>
+            <span className="text-sm text-slate-400 dark:text-slate-400">/ 5</span>
           </div>
         </div>
         <RiskBadge level={finding.severity} size="sm" />
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm leading-relaxed text-slate-700">{finding.explanation}</p>
+        <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">{finding.explanation}</p>
 
         {finding.evidence.length > 0 && (
           <div>
-            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
               <ShieldAlert className="h-3.5 w-3.5" /> Evidence / Risk Factors
             </div>
             <ul className="space-y-1">
               {finding.evidence.map((e, i) => (
-                <li key={i} className="flex gap-2 text-sm text-slate-600">
+                <li key={i} className="flex gap-2 text-sm text-slate-600 dark:text-slate-300">
                   <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-400" />
                   {e}
                 </li>
@@ -50,12 +50,12 @@ export function FindingCard({ finding, sourceMap }: { finding: FindingRecord; so
 
         {finding.recommendedMitigation.length > 0 && (
           <div>
-            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
               <Wrench className="h-3.5 w-3.5" /> Recommended Mitigation
             </div>
             <ul className="space-y-1">
               {finding.recommendedMitigation.map((c, i) => (
-                <li key={i} className="flex gap-2 text-sm text-slate-600">
+                <li key={i} className="flex gap-2 text-sm text-slate-600 dark:text-slate-300">
                   <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-emerald-500" />
                   {c}
                 </li>
@@ -66,7 +66,7 @@ export function FindingCard({ finding, sourceMap }: { finding: FindingRecord; so
 
         {sources.length > 0 && (
           <div>
-            <div className="mb-1.5 text-xs font-semibold text-slate-500">Sources</div>
+            <div className="mb-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">Sources</div>
             <div className="flex flex-wrap gap-2">
               {sources.map((s) => (
                 <a
@@ -79,7 +79,7 @@ export function FindingCard({ finding, sourceMap }: { finding: FindingRecord; so
                 >
                   {s.title.length > 40 ? s.title.slice(0, 40) + "…" : s.title}
                   <ExternalLink className="h-3 w-3" />
-                  {!s.verified && <Badge className="ml-1 border-none bg-transparent p-0 text-[10px] text-amber-600">Unverified</Badge>}
+                  {!s.verified && <Badge className="ml-1 border-none bg-transparent p-0 text-[10px] text-amber-600 dark:text-amber-400">Unverified</Badge>}
                 </a>
               ))}
             </div>
@@ -88,7 +88,7 @@ export function FindingCard({ finding, sourceMap }: { finding: FindingRecord; so
 
         {noSourcesFound && (
           <Alert variant="warning" title="Research unavailable">
-            This finding could not be verified against an external source. Treat this dimension's evidence as the deterministic engine's reasoning
+            This finding could not be verified against an external source. Treat this dimension's evidence as the assessment's reasoning
             alone, not as externally-cited fact.
           </Alert>
         )}

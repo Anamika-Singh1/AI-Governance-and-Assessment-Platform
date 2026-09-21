@@ -14,6 +14,8 @@ import {
   notFoundHandler
 } from "./middleware/errorHandler";
 import { auditLog } from "./middleware/auditLog";
+import cookieParser from "cookie-parser";
+import authRouter from "./routes/auth";
 
 export function createApp() {
   const app = express();
@@ -26,9 +28,11 @@ export function createApp() {
     cors({
       origin: config.corsOrigin,
       methods: ["GET", "POST"],
-      allowedHeaders: ["Content-Type", "Authorization"]
+      allowedHeaders: ["Content-Type", "Authorization"],
+      credentials: true
     })
   );
+  app.use(cookieParser());
 
   app.use(
     express.json({
@@ -75,6 +79,7 @@ export function createApp() {
       version: config.assessmentEngineVersion
     });
   });
+  app.use("/api/auth", authRouter);
 
   // API routes
   app.use("/api/use-cases", useCasesRouter);

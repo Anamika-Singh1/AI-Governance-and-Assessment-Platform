@@ -14,11 +14,11 @@ import {
 const router = Router();
 
 router.post("/", requireApiKey, asyncHandler(createAssessment));
-router.get("/", asyncHandler(listAssessmentsHandler));
-router.get("/:id", asyncHandler(getAssessmentHandler));
+router.get("/", requireApiKey, asyncHandler(listAssessmentsHandler));
+router.get("/:id", requireApiKey, asyncHandler(getAssessmentHandler));
 router.post("/:id/run", requireApiKey, asyncHandler(rerunAssessmentHandler));
-router.get("/:id/findings", asyncHandler(getFindingsHandler));
-router.get("/:id/sources", asyncHandler(getAssessmentSourcesHandler));
-router.get("/:id/dimensions", asyncHandler(getAssessmentDimensionsHandler));
+router.get("/:id/findings", requireApiKey, asyncHandler(getFindingsHandler));
+router.get("/:id/sources", requireApiKey, asyncHandler(getAssessmentSourcesHandler));
+router.get("/:id/dimensions", requireApiKey, asyncHandler(getAssessmentDimensionsHandler));
 
 export default router;

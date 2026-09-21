@@ -1,7 +1,6 @@
 -- AI Governance Assessment Platform — initial schema
 -- PostgreSQL 16 + pgvector. Normalized, tenant-scoped, indexed for pagination.
 
-CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pgcrypto; -- gen_random_uuid()
 
 -- ---------------------------------------------------------------------
@@ -24,10 +23,13 @@ CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'member',
+  password_hash TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT '',
+  role TEXT NOT NULL DEFAULT 'ASSESSOR' CHECK (role IN ('ADMIN','ASSESSOR','REVIEWER','VIEWER')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, email)
 );
+CREATE UNIQUE INDEX idx_users_email_lower ON users (lower(email));
 
 -- ---------------------------------------------------------------------
 -- industries: lets new industries (Healthcare, Insurance, Employment,
@@ -211,7 +213,7 @@ CREATE TABLE source_chunks (
   chunk_index INTEGER NOT NULL,
   content TEXT NOT NULL,
   dimension_tags JSONB NOT NULL DEFAULT '[]', -- which governance dimensions this chunk is relevant to
-  embedding vector(256),
+  embedding DOUBLE PRECISION[],
   UNIQUE (source_id, chunk_index)
 );
 -- No ANN index at seed scale (a few dozen chunks): an ivfflat index needs

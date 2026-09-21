@@ -1,9 +1,6 @@
 # Multi-stage build: compile the Vite/React SPA, then serve the static
-# output with nginx. The backend URL and API key are NOT baked in at
-# build time — the app reads them from localStorage at runtime (see
-# src/lib/settings.ts), configured via the in-app Settings page. That
-# means this same built image works against any backend URL without a
-# rebuild.
+# output with nginx. nginx forwards same-origin /api requests to the backend;
+# users never configure infrastructure URLs or credentials in the browser.
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./

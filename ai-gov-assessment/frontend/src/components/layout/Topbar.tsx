@@ -1,45 +1,22 @@
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import { Link } from "react-router-dom";
-import { Wifi, WifiOff } from "lucide-react";
+import { RefObject } from "react";
+import { Menu } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { ThemeToggle } from "./ThemeToggle";
 
-export function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
-  const [connected, setConnected] = useState<"checking" | "up" | "down">("checking");
-
-  useEffect(() => {
-    let mounted = true;
-    api
-      .health()
-      .then(() => mounted && setConnected("up"))
-      .catch(() => mounted && setConnected("down"));
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
+export function Topbar({ title, subtitle, onOpenMenu, menuButtonRef }: { title: string; subtitle?: string; onOpenMenu: () => void; menuButtonRef: RefObject<HTMLButtonElement | null> }) {
+  const {user}=useAuth();
   return (
-    <header className="flex items-center justify-between border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur">
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
-        {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
+    <header className="z-10 shrink-0 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 sm:px-8">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <button ref={menuButtonRef} type="button" onClick={onOpenMenu} aria-label="Open navigation" aria-haspopup="dialog" aria-controls="mobile-navigation" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-600 focus-visible:outline-brand-500 dark:border-slate-700 dark:text-slate-300 lg:hidden"><Menu className="h-5 w-5" /></button>
+        <h1 className="min-w-0 flex-1 text-base font-semibold tracking-tight text-slate-900 [overflow-wrap:anywhere] dark:text-slate-100 sm:text-lg">{title}</h1>
+        <div className="flex shrink-0 items-center justify-end gap-3">
+          <span className="hidden max-w-40 truncate text-xs text-slate-500 dark:text-slate-400 sm:block">{user?.name}</span>
+          <ThemeToggle />
+
+        </div>
       </div>
-      <Link
-        to="/settings"
-        className="flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50"
-        title="API connection status — configure in Settings"
-      >
-        {connected === "up" && (
-          <>
-            <Wifi className="h-3.5 w-3.5 text-emerald-600" /> API connected
-          </>
-        )}
-        {connected === "down" && (
-          <>
-            <WifiOff className="h-3.5 w-3.5 text-red-600" /> API unreachable
-          </>
-        )}
-        {connected === "checking" && <>Checking API…</>}
-      </Link>
+      {subtitle && <p className="mt-2 text-xs text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400 sm:text-sm">{subtitle}</p>}
     </header>
   );
 }

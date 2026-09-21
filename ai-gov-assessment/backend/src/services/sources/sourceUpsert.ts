@@ -71,7 +71,7 @@ export async function upsertSourceAndChunks(
       `INSERT INTO source_chunks (source_id, chunk_index, content, dimension_tags, embedding)
        VALUES ($1,$2,$3,$4,$5)
        ON CONFLICT (source_id, chunk_index) DO UPDATE SET content=$3, dimension_tags=$4, embedding=$5`,
-      [source.id, idx, content, JSON.stringify(dims), `[${embedding.join(",")}]`]
+      [source.id, idx, content, JSON.stringify(dims), embedding]
     );
     chunksWritten++;
   }

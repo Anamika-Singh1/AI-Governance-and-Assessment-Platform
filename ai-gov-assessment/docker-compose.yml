@@ -40,7 +40,8 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://aigov:aigov_local_dev@postgres:5432/ai_gov
       PG_POOL_MAX: ${PG_POOL_MAX:-10}
-      API_KEY: ${API_KEY:-changeme-local-dev-key}
+      JWT_SECRET: ${JWT_SECRET:-local-compose-secret-change-before-production}
+      SESSION_HOURS: ${SESSION_HOURS:-8}
       LLM_PROVIDER: ${LLM_PROVIDER:-deterministic}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-5}

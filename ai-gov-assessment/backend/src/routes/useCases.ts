@@ -5,7 +5,7 @@ import { createUseCaseHandler, listUseCasesHandler, getUseCaseHandler } from "..
 
 const router = Router();
 router.post("/", requireApiKey, asyncHandler(createUseCaseHandler));
-router.get("/", asyncHandler(listUseCasesHandler));
-router.get("/:id", asyncHandler(getUseCaseHandler));
+router.get("/", requireApiKey, asyncHandler(listUseCasesHandler));
+router.get("/:id", requireApiKey, asyncHandler(getUseCaseHandler));
 
 export default router;
