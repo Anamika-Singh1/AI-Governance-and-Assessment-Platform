@@ -17,6 +17,11 @@ expected 401. Leave `VITE_API_BASE_URL` empty in the frontend Vercel Production
 environment so requests use this same-origin proxy. Set backend `CORS_ORIGIN`
 to `https://frontend-navy-seven-58.vercel.app` and `NODE_ENV=production`.
 The default `COOKIE_SAME_SITE=lax` works with this same-origin proxy.
+When Vercel sets `VERCEL=1`, the backend trusts one proxy hop for client IP
+resolution, so rate limiting uses forwarded client addresses. Direct local
+deployments keep proxy trust disabled. The rate-limit proxy validation message
+is logged separately from database errors; resolving it does not establish
+that the production database is reachable.
 
 The Express backend must be deployed separately with PostgreSQL configured.
 The development proxy in `vite.config.ts` does not run in production.

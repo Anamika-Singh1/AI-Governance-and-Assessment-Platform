@@ -20,6 +20,11 @@ import authRouter from "./routes/auth";
 export function createApp() {
   const app = express();
 
+  // Vercel supplies the client address through its immediate reverse proxy.
+  // Trust only that hop, not arbitrary addresses prepended to the header.
+  // Direct local/Docker deployments retain Express's default of no proxy trust.
+  if (process.env.VERCEL === "1") app.set("trust proxy", 1);
+
   app.disable("x-powered-by");
 
   app.use(helmet());
