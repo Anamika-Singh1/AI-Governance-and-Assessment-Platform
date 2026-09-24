@@ -50,6 +50,8 @@ export async function retrieveEvidenceForDimension(
 
   let res;
   try {
+    // Older databases use pgvector; newer schemas use double precision[].
+    // Both support real[] casts, while unnest cannot accept vector directly.
     res = await pgPool.query(
       `SELECT sc.id AS source_chunk_id, sc.content, sc.source_id,
               s.title, s.publisher, s.url, s.source_type, s.jurisdiction,
@@ -60,7 +62,7 @@ export async function retrieveEvidenceForDimension(
        JOIN sources s ON s.id = sc.source_id
        CROSS JOIN LATERAL (
          SELECT SUM(value * ($1::double precision[])[position]) AS score
-         FROM unnest(sc.embedding) WITH ORDINALITY AS component(value, position)
+         FROM unnest(sc.embedding::real[]) WITH ORDINALITY AS component(value, position)
        ) similarity
        WHERE similarity.score >= $4
        ORDER BY dimension_tagged DESC, similarity.score DESC, sc.id
