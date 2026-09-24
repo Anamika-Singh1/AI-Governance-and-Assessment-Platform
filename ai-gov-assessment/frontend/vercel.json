@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://backend-psi-topaz-20.vercel.app/api/:path*"
+    },
+    {
+      "source": "/:page(login|new-assessment|findings|sources|history|methodology|governance-rules|settings)",
+      "destination": "/index.html"
+    },
+    { "source": "/assessments/:path*", "destination": "/index.html" },
+    { "source": "/use-cases/:path*", "destination": "/index.html" }
+  ]
+}
