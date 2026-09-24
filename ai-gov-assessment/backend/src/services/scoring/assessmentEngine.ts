@@ -142,11 +142,13 @@ async function scoreDimensionFromRules(
   structuredCtx: RuleContext,
   input: UseCaseInput
 ): Promise<{ assessment: Omit<DimensionAssessment, "sourceIds">; evidence: RetrievedEvidence[] }> {
-  const rules = await getActiveGovernanceRules(dim.key);
+  const [rules, evidence] = await Promise.all([
+    getActiveGovernanceRules(dim.key),
+    retrieveEvidenceForDimension(input, dim as any)
+  ]);
   const fired = evaluateRules(rules, structuredCtx);
   const rawScore = fired.reduce((sum, f) => sum + (f.scoreDelta || 0), 0);
   const score = clamp(rawScore);
-  const evidence = await retrieveEvidenceForDimension(input, dim as any);
 
   const riskFactors = fired.filter((f) => (f.scoreDelta || 0) > 0).map((f) => f.reason);
   return {
@@ -180,12 +182,11 @@ export async function runDeterministicAssessment(input: UseCaseInput, signals: E
   const regScore = regulatoryExposureScore(regulatoryMapping);
   const regSourceIds = Array.from(new Set(regulatoryMapping.map((m) => m.sourceId)));
 
-  const dimensionAssessments: DimensionAssessment[] = [];
-  for (const dim of dimensions) {
+  const dimensionAssessments: DimensionAssessment[] = await Promise.all(dimensions.map(async (dim): Promise<DimensionAssessment> => {
     if (dim.key === "REGULATORY_EXPOSURE") {
       const matched = regulatoryMapping.filter((m) => m.applicability === "Applicable");
       const potential = regulatoryMapping.filter((m) => m.applicability === "Potentially Applicable");
-      dimensionAssessments.push({
+      return {
         dimension: "REGULATORY_EXPOSURE",
         score: regScore,
         reasoning: `Based on the described data, decision domain, and region, ${matched.length} regulation(s)/framework(s) were classified as Applicable and ${potential.length} as Potentially Applicable. See the Regulatory Mapping section for the full breakdown and reasoning per item.`,
@@ -193,15 +194,14 @@ export async function runDeterministicAssessment(input: UseCaseInput, signals: E
         riskFactors: regulatoryMapping.filter((m) => m.applicability === "Applicable").map((m) => `${m.name} likely applies`),
         recommendedControls: dim.recommendedControls,
         sourceIds: regSourceIds
-      });
-      continue;
+      };
     }
     const { assessment, evidence } = await scoreDimensionFromRules(dim, structuredCtx, input);
     const legacyCtx = buildScoringContext(input, signals);
     const ruleSourceIds = selectSourcesForDimension(dim.key as DimensionKey, legacyCtx);
     const retrievedSourceIds = evidence.map((e) => e.sourceId);
-    dimensionAssessments.push({ ...assessment, sourceIds: Array.from(new Set([...retrievedSourceIds, ...ruleSourceIds])) });
-  }
+    return { ...assessment, sourceIds: Array.from(new Set([...retrievedSourceIds, ...ruleSourceIds])) };
+  }));
 
   const { overallScore, riskPercentage } = calculateOverallScore(dimensionAssessments);
   const triggeredRules = await applyOverrideRules(dimensionAssessments, signals);

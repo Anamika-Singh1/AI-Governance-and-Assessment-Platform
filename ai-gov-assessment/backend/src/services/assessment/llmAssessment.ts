@@ -79,7 +79,7 @@ Keep each reasoning under 100 words and each array concise.`;
       headers: { "content-type": "application/json", authorization: `Bearer ${config.openaiApiKey}` },
       body: JSON.stringify({ model: config.openaiModel, response_format: { type: "json_object" },
         messages: [{ role: "system", content: system }, { role: "user", content: JSON.stringify({ useCase: input, dimensions: DIMENSIONS, sources }) }] }),
-      signal: AbortSignal.timeout(120000)
+      signal: AbortSignal.timeout(config.assessmentTimeoutMs)
     });
   } catch {
     throw new AppError("The LLM request timed out or could not connect. Please retry. No assessment was saved.", 502, "LLM_CONNECTION_ERROR");

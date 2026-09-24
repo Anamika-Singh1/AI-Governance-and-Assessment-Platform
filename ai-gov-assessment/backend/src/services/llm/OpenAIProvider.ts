@@ -1,4 +1,5 @@
 import { ExtractedSignals, UseCaseInput } from "../../types";
+import { config } from "../../config/env";
 import { LLMProvider } from "./LLMProvider";
 import { extractSignalsDeterministic } from "./DeterministicExtractor";
 import { buildExtractionPrompt, parseExtractionResponse } from "../../prompts/extractionPrompt";
@@ -34,7 +35,7 @@ export class OpenAIProvider implements LLMProvider {
           messages: [{ role: "user", content: prompt }],
           temperature: 0.2
         }),
-        signal: AbortSignal.timeout(20000)
+        signal: AbortSignal.timeout(config.extractionTimeoutMs)
       });
       if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`);
       const data: any = await res.json();

@@ -1,5 +1,12 @@
 # LLM assessments
 
+Provider waits default to 5 seconds for OpenAI signal extraction and 15 seconds
+for assessment generation before using the existing rule-based fallback.
+Configure `EXTRACTION_TIMEOUT_MS` and `ASSESSMENT_TIMEOUT_MS` on the backend to
+override these budgets (1,000–120,000 milliseconds). Shorter budgets may use
+the fallback more often. Database reads and saving take additional time.
+Fallback dimension queries run concurrently within the database pool limit.
+
 New runs call OpenAI to generate all ten dimension scores and severities, overall risk and impact, reasoning, recommendations, oversight and regulatory applicability. The original use-case input and curated source descriptions are sent to the model. If the provider is unavailable, unconfigured, or returns an invalid response, the assessment service uses the existing rule-based engine with the submitted input and stored governance rules. It saves the result with `llmProviderUsed: deterministic (fallback)`, records the provider failure code in the audit trail, and displays the result directly without a warning banner.
 
 Configure `backend/.env` (never commit the key):

@@ -6,6 +6,11 @@ function bool(v: string | undefined, fallback: boolean): boolean {
   return v === "true" || v === "1";
 }
 
+function timeoutMs(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 1000 && parsed <= 120000 ? parsed : fallback;
+}
+
 export const config = {
   port: parseInt(process.env.PORT || "4000", 10),
   nodeEnv: process.env.NODE_ENV || "development",
@@ -23,6 +28,8 @@ export const config = {
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   anthropicModel: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5",
   openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
+  assessmentTimeoutMs: timeoutMs(process.env.ASSESSMENT_TIMEOUT_MS, 15000),
+  extractionTimeoutMs: timeoutMs(process.env.EXTRACTION_TIMEOUT_MS, 5000),
   localLlmUrl: process.env.LOCAL_LLM_URL || "",
   localLlmModel: process.env.LOCAL_LLM_MODEL || "llama3.1",
   corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173",
