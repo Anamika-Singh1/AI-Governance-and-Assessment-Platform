@@ -13,7 +13,7 @@
     "db:repair-research": "tsx src/database/repairResearch.ts",
     "sources:import": "tsx src/database/importSourcesCli.ts",
     "test": "vitest run",
-    "test:llm": "npm run build && node --test tests/llmAssessment.test.cjs",
+    "test:llm": "npm run build && node --test tests/llmAssessment.test.cjs tests/assessmentFallback.test.cjs",
     "test:watch": "vitest",
     "lint": "tsc --noEmit"
   },

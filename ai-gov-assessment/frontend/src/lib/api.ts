@@ -1,5 +1,6 @@
 import { Assessment, AssessmentListItem, FindingRecord, MethodologyResponse, RulesResponse, SourceRecord, SourceType, UseCaseInput, UseCaseRecord, UseCaseListItem } from "@/types/api";
 import { getApiBaseUrl } from "./settings";
+import { getCacheScope, setCacheScope, readResult, writeResult, markFallback } from "./resultCache";
 
 export class ApiError extends Error {
   status: number;
@@ -12,6 +13,42 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, opts: RequestInit = {}, _auth = false): Promise<T> {
+  const owner = getCacheScope();
+  const method = opts.method || "GET";
+  const cachePath = method === "GET" && /^\/api\/(assessments|use-cases|sources)(\/|\?|$)/.test(path)
+    ? path
+    : method === "POST" && /^\/api\/assessments\/[^/]+\/run$/.test(path)
+      ? path.replace(/\/run$/, "") : null;
+  try {
+    const result = await liveRequest<T>(path, opts, _auth);
+    if (/^\/api\/auth\/(me|login|register|reset-password)$/.test(path)) {
+      const user = (result as { user: AuthUser }).user;
+      setCacheScope(`${getApiBaseUrl()}:${user.tenantId}:${user.id}`);
+    }
+    if (path === "/api/auth/logout") setCacheScope(null);
+    if (cachePath) {
+      writeResult(owner, cachePath, result);
+      markFallback(cachePath, false);
+    }
+    if (method === "POST" && (path === "/api/assessments" || path.endsWith("/run"))) {
+      const assessment = result as Assessment;
+      writeResult(owner, `/api/assessments/${assessment.useCaseId}`, assessment);
+      writeResult(owner, `/api/assessments/${assessment.useCaseId}/findings`, assessment.findings);
+    }
+    return result;
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) setCacheScope(null);
+    const unavailable = error instanceof TypeError || error instanceof ApiError && (error.status >= 500 || error.status === 429 || error.status === 408);
+    const saved = cachePath && unavailable ? readResult<T>(owner, cachePath) : undefined;
+    if (saved !== undefined) {
+      markFallback(cachePath!, true);
+      return saved;
+    }
+    throw error;
+  }
+}
+
+async function liveRequest<T>(path: string, opts: RequestInit = {}, _auth = false): Promise<T> {
   const base = getApiBaseUrl();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

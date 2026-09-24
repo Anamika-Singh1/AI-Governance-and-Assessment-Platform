@@ -22,12 +22,31 @@ export function AssessmentResultsPage() {
   const { id } = useParams();
   const { data, loading, error, reload } = useAssessment(id);
   const [sourceMap, setSourceMap] = useState<Record<string, SourceRecord>>({});
+  const [rerunning, setRerunning] = useState(false);
+  const [rerunError, setRerunError] = useState<string | null>(null);
+
+  async function rerun() {
+    if (!id || rerunning) return;
+    setRerunning(true);
+    setRerunError(null);
+    try {
+      await api.rerunAssessment(id);
+      reload();
+    } catch (error) {
+      setRerunError(error instanceof Error ? error.message : "Unable to rerun assessment. Please try again.");
+    } finally {
+      setRerunning(false);
+    }
+  }
 
   useEffect(() => {
     if (!id) return;
+    let active = true;
+    setSourceMap({});
     api.getAssessmentSources(id).then((sources) => {
-      setSourceMap(Object.fromEntries(sources.map((s) => [s.id, s])));
-    });
+      if (active) setSourceMap(Object.fromEntries(sources.map((s) => [s.id, s])));
+    }).catch(() => { if (active) setSourceMap({}); });
+    return () => { active = false; };
   }, [id]);
 
   if (loading) {
@@ -58,9 +77,10 @@ export function AssessmentResultsPage() {
     <AppShell title={data.useCaseName} subtitle={`${data.industry} · ${data.region}`}>
       <div className="space-y-6">
         {/* Overall risk hero */}
-        <Card className="overflow-hidden">
-          <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-[1fr_auto]">
-            <div>
+        <Card className="overflow-hidden border-t-4 border-t-brand-500">
+          <div className="grid grid-cols-1 gap-6 p-5 sm:p-7 md:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="min-w-0">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">Assessment overview</p>
               <div className="flex flex-wrap items-center gap-3">
                 <RiskBadge level={data.riskLevel} size="lg" />
                 <Badge>{data.impactLevel}</Badge>
@@ -87,17 +107,19 @@ export function AssessmentResultsPage() {
                 </div>
               </div>
             </div>
-            <div className="flex flex-col items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-950 px-8 py-5 text-center">
-              <div className="text-4xl font-bold text-slate-900 dark:text-slate-100">{data.riskPercentage}%</div>
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-brand-100 bg-brand-50/60 dark:border-slate-700 dark:bg-slate-950 px-6 py-6 text-center">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Overall risk score</div>
+              <div className="text-5xl font-semibold tracking-tight tabular-nums text-slate-900 dark:text-slate-100">{data.riskPercentage}%</div>
               <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {data.overallScore} / {data.maxScore} points
               </div>
-              <Button size="sm" variant="outline" className="mt-3" onClick={() => api.rerunAssessment(data.useCaseId).then(() => reload())}>
-                <RefreshCw className="h-3.5 w-3.5" /> Re-run
+              <Button variant="outline" className="mt-5 w-full" disabled={rerunning} onClick={rerun}>
+                <RefreshCw className={`h-4 w-4 ${rerunning ? "animate-spin" : ""}`} /> {rerunning ? "Assessing…" : "Run again"}
               </Button>
             </div>
           </div>
         </Card>
+        {rerunError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">{rerunError}</p>}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
           <Card className="lg:col-span-3">

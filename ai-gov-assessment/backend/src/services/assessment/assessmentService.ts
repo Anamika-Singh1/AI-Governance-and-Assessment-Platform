@@ -1,11 +1,12 @@
-import { AuditTrailEntry } from "../../types";
+import { AssessmentResult, AuditTrailEntry } from "../../types";
 import { runLLMAssessment } from "./llmAssessment";
+import { runDeterministicAssessment } from "../scoring/assessmentEngine";
 import { saveAssessment, getAssessmentById, listAssessments, getDimensionsForAssessment } from "../../repositories/assessmentRepository";
 import { getUseCaseById } from "../../repositories/useCaseRepository";
 import { StoredAssessment } from "../../repositories/types";
 import { AppError } from "../../utils/validation";
 
-/** Generate a fresh LLM assessment and persist its complete result and provenance. */
+/** Prefer the LLM; persist a clearly identified rule-based result if the provider fails. */
 export async function runAssessment(useCaseId: string, userId?: string): Promise<StoredAssessment> {
   const useCase = await getUseCaseById(useCaseId, userId);
   if (!useCase) throw new AppError("Use case not found.", 404, "NOT_FOUND");
@@ -20,11 +21,22 @@ export async function runAssessment(useCaseId: string, userId?: string): Promise
     detail: `Extraction method "${useCase.signals.extractionMethod}" from use-case creation time is reused; the LLM assesses the original use-case input on this run.`
   });
 
-  const result = await runLLMAssessment(useCase.input, useCase.signals);
+  let result: AssessmentResult;
+  let fallback = false;
+  try {
+    result = await runLLMAssessment(useCase.input, useCase.signals);
+  } catch (error) {
+    const providerFailures = new Set(["LLM_NOT_CONFIGURED", "LLM_CONNECTION_ERROR", "LLM_QUOTA_EXCEEDED", "LLM_API_ERROR", "LLM_INVALID_RESPONSE"]);
+    if (!(error instanceof AppError) || !providerFailures.has(error.code)) throw error;
+    result = await runDeterministicAssessment(useCase.input, useCase.signals);
+    result.llmProviderUsed = "deterministic (fallback)";
+    fallback = true;
+    auditTrail.push({ timestamp: ts(), step: "Rule-based fallback", detail: `AI assessment unavailable (${error.code}). Generated this assessment using stored governance rules and the submitted use case.` });
+  }
 
   auditTrail.push({
     timestamp: ts(),
-    step: "LLM assessment",
+    step: fallback ? "Rule-based assessment" : "LLM assessment",
     detail: `Scored all 10 governance dimensions. Overall score ${result.overallScore}/${result.maxScore} (${result.riskPercentage}%).`
   });
 

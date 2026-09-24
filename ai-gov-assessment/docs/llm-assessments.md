@@ -1,6 +1,6 @@
 # LLM assessments
 
-New runs call OpenAI to generate all ten dimension scores and severities, overall risk and impact, reasoning, recommendations, oversight and regulatory applicability. The original use-case input and curated source descriptions are sent to the model. No rule-based score or canned narrative is used as a fallback.
+New runs call OpenAI to generate all ten dimension scores and severities, overall risk and impact, reasoning, recommendations, oversight and regulatory applicability. The original use-case input and curated source descriptions are sent to the model. If the provider is unavailable, unconfigured, or returns an invalid response, the assessment service uses the existing rule-based engine with the submitted input and stored governance rules. It saves the result with `llmProviderUsed: deterministic (fallback)`, records the provider failure code in the audit trail, and displays the result directly without a warning banner.
 
 Configure `backend/.env` (never commit the key):
 
@@ -10,7 +10,7 @@ OPENAI_API_KEY=your-key
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-Restart the backend after configuration changes. HTTP 401 means the API rejected the credentials; HTTP 429 requires checking quota, billing or rate limits. A failed or invalid model response produces an error and saves no assessment.
+Restart the backend after configuration changes. Provider HTTP 401 means the API rejected the credentials; HTTP 429 requires checking quota, billing or rate limits. These provider failures trigger rule-based assessment. Database, authorization, and fallback-engine failures still produce errors; they are not replaced with sample results.
 
 For database upgrades, run from the repository root:
 
